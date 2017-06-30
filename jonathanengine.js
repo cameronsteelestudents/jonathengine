@@ -12,6 +12,16 @@ var xDirection = 0;
 var yDirection = 0;
 var playerSpeed = 10;
 
+window.addEventListener('mousedown', mouseDown);
+function mouseDown(event) {
+	var projectile = new GameObject(player.position.x, player.position.y, 5, 5, 'rgb(200, 200, 0)');
+	var mousePosition = new Vector2D(event.clientX, -event.clientY);
+
+	var differenceVector = mousePosition.subtract(player.position);
+	differenceVector.normalize();
+	projectile.velocity = differenceVector;
+}
+
 window.addEventListener('keyup', keyUp);
 function keyUp(event) {
 	if(event.keyCode == 68) {
@@ -64,7 +74,7 @@ function keyDown(event) {
 
 var gameObjects = [];
 
-var player = new GameObject(0, 0, 25, 25, 'purple');
+var player = new Character(0, 0, 'purple');
 var rock = new GameObject(100, 10, 5, 5, 'gray');
 var tree = new GameObject(50, 40, 20, 100, 'green');
 var ground1 = new GameObject(0, -525, 1000, 10, 'black');
@@ -112,9 +122,17 @@ function update() {
 			gameObject.velocity.y -= gravityForce;
 		}
 
+		var drawX = gameObject.position.x;
+		var drawY = gameObject.position.y;
+
+		if(gameObject.relative != null) {
+			drawX += gameObject.relative.position.x;
+			drawY += gameObject.relative.position.y;
+		}
+
 		// Actually do the move
 		tools.fillStyle = gameObject.color;
-		tools.fillRect(gameObject.position.x, -gameObject.position.y, gameObject.w, gameObject.h);
+		tools.fillRect(drawX, -drawY, gameObject.w, gameObject.h);
 
 		// Reset staticCollision so that "grounded" doesn't last forever
 		if(staticCollision == false) {
@@ -123,7 +141,7 @@ function update() {
 	}
 
 
-	setTimeout(update, 15);
+	setTimeout(update, 10);
 }
 
 update();
@@ -152,14 +170,24 @@ function Vector2D(x, y) {
 	me.x = x;
 	me.y = y;
 
-	this.add = function(otherVector) {
+	me.add = function(otherVector) {
 		return new Vector2D(me.x + otherVector.x, me.y + otherVector.y);
+	}
+
+	me.subtract = function(otherVector) {
+		return new Vector2D(me.x - otherVector.x, me.y - otherVector.y);
+	}
+
+	me.getMagnitude = function() {
+		// 
+	}
+
+	me.normalize = function() {
+
 	}
 }
 
 function GameObject(x, y, w, h, color) {
-	// this.x = x;
-	// this.y = y;
 	var me = this;
 	me.position = new Vector2D(x, y);
 	me.velocity = new Vector2D(0, 0);
@@ -169,20 +197,30 @@ function GameObject(x, y, w, h, color) {
 	me.static = false;
 	me.grounded = false;
 	me.color = color;
+	me.relative = null;
 
 	gameObjects.push(me);
 }
 
+function Character(x, y, color) {
+	GameObject.call(this, x, y, 50, 50, color);
+
+	var me = this;
+
+	me.health = 100;
+	me.healthBar = new GameObject(0, 20, 100, 10, 'green');
+	me.healthBar.relative = this;
+	me.healthBar.static = true;
+}
+
 function Enemy(x, y) {
-	GameObject.call(this, x, y, 50, 50, 'red');
+	Character.call(this, x, y, 'rgba(200, 0, 0, 0.5)');
 
 	var me = this;
 
 	me.tags.push('enemy');
 
 	me.speed = 1;
-
-	me.health = 100;
 
 	me.think = function() {
 		if(me.position.x > player.position.x) {
