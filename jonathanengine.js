@@ -1,3 +1,5 @@
+// 
+
 var gamescreen = document.getElementById('gameScreen');
 
 var windowWidth = document.body.offsetWidth;
@@ -11,15 +13,17 @@ var gravityForce = 0.4;
 var xDirection = 0;
 var yDirection = 0;
 var playerSpeed = 10;
+var projectileSpeed = 10;
 
 window.addEventListener('mousedown', mouseDown);
 function mouseDown(event) {
-	var projectile = new GameObject(player.position.x, player.position.y, 5, 5, 'rgb(200, 200, 0)');
+	var projectile = new Projectile(player.position.x, player.position.y, 'rgb(200, 200, 0)');
 	var mousePosition = new Vector2D(event.clientX, -event.clientY);
 
 	var differenceVector = mousePosition.subtract(player.position);
 	differenceVector.normalize();
-	projectile.velocity = differenceVector;
+
+	projectile.velocity = differenceVector.multiply(projectileSpeed);
 }
 
 window.addEventListener('keyup', keyUp);
@@ -74,13 +78,17 @@ function keyDown(event) {
 
 var gameObjects = [];
 
-var player = new Character(0, 0, 'purple');
+var player = new Character(0, -200, 'purple');
 var rock = new GameObject(100, 10, 5, 5, 'gray');
 var tree = new GameObject(50, 40, 20, 100, 'green');
-var ground1 = new GameObject(0, -525, 1000, 10, 'black');
+var ground1 = new GameObject(0, -525, 1000, 10, 'purple');
 ground1.static = true;
-var ground2 = new GameObject(300, -425, 1000, 10, 'black');
+var ground2 = new GameObject(300, -425, 1000, 10, 'blue');
 ground2.static = true;
+var ground3 = new GameObject(150, -237, 200, 10, 'red');
+ground3.static = true;
+var ground4 = new GameObject(800, -237, 200, 10, 'red');
+ground4.static = true;
 var enemy1 = new Enemy(300, 0);
 
 function update() {
@@ -108,17 +116,30 @@ function update() {
 			}
 
 			if(checkCollision(gameObject, colliderObject)) {
-				if(colliderObject.static == true) {
-					gameObject.grounded = true;
-					staticCollision = true;
-					gameObject.velocity.y = 0;
-					gameObject.position.y = colliderObject.position.y + gameObject.h;
+				if(!gameObject.static && colliderObject.static == true) {
+					// if(!gameObject.grounded) {
+						gameObject.grounded = true;
+						staticCollision = true;
+						gameObject.velocity.y = 0;
+						gameObject.position.y = colliderObject.position.y + gameObject.h;
+					// }
+				}
+
+				if(gameObject.tags.indexOf('enemy') != -1) {
+					if(colliderObject.tags.indexOf('projectile') != -1) {
+						gameObject.changeHealth(-10);
+						colliderObject.destroy();
+					}
+
+					if(colliderObject == player) {
+						colliderObject.changeHealth(-100);
+					}
 				}
 			}
 		}
 
 		// If not "grounded", let gravity do its thing
-		if(gameObject.static == false && gameObject.grounded == false) {
+		if(gameObject.static == false && gameObject.grounded == false && gameObject.kinematic == false) {
 			gameObject.velocity.y -= gravityForce;
 		}
 
@@ -128,6 +149,14 @@ function update() {
 		if(gameObject.relative != null) {
 			drawX += gameObject.relative.position.x;
 			drawY += gameObject.relative.position.y;
+		}
+
+		if(gameObject != player) {
+			drawX -= player.position.x - 500;
+			drawY -= player.position.y + 500;
+		} else {
+			drawX = 500;
+			drawY = -500;
 		}
 
 		// Actually do the move
@@ -158,9 +187,10 @@ function checkCollision(gameObjectA, gameObjectB) {
 	var tyB = gameObjectB.position.y;
 	var byB = gameObjectB.position.y - gameObjectB.h;
 
-	if(rxA < lxB || rxB < lxA || byA > tyB || byB > tyA) {
+	if (rxA < lxB || rxB < lxA || byA > tyB || byB > tyA) {
 		return false;
-	} else {
+	} 
+	else {
 		return true;
 	}
 }
@@ -178,12 +208,17 @@ function Vector2D(x, y) {
 		return new Vector2D(me.x - otherVector.x, me.y - otherVector.y);
 	}
 
+	me.multiply = function(multiplier) {
+		return new Vector2D(me.x * multiplier, me.y * multiplier);
+	}
+
 	me.getMagnitude = function() {
-		// 
+		return Math.sqrt(Math.pow(me.x,2) + Math.pow(me.y,2));
 	}
 
 	me.normalize = function() {
-
+		me.x /= this.getMagnitude();
+		me.y /= this.getMagnitude();
 	}
 }
 
@@ -195,11 +230,27 @@ function GameObject(x, y, w, h, color) {
 	me.h = h;
 	me.tags = [];
 	me.static = false;
+	me.kinematic = false;
 	me.grounded = false;
 	me.color = color;
 	me.relative = null;
 
+	me.destroy = function() {
+		gameObjects.splice(gameObjects.indexOf(me), 1);
+	}
+
 	gameObjects.push(me);
+}
+
+function Projectile(x, y, color) {
+	GameObject.call(this, x, y, 5, 5, "purple");
+
+	var me = this;
+	me.kinematic = true;
+	me.tags.push('projectile');
+
+	// me.static = true;
+	// me.grounded = true;
 }
 
 function Character(x, y, color) {
@@ -208,9 +259,30 @@ function Character(x, y, color) {
 	var me = this;
 
 	me.health = 100;
-	me.healthBar = new GameObject(0, 20, 100, 10, 'green');
+	me.maxHealth = me.health;
+	me.healthBarBackground = new GameObject(0, 20, me.w, 10, 'red');
+	me.healthBarBackground.relative = this;
+	me.healthBarBackground.static = true;
+	me.healthBar = new GameObject(0, 20, me.w, 10, 'green');
 	me.healthBar.relative = this;
 	me.healthBar.static = true;
+
+	me.tags.push('character');
+
+	me.changeHealth = function(amount) {
+		me.health += amount;
+		me.healthBar.w = (me.health / me.maxHealth) * me.w;
+
+		if(me.health <= 0) {
+			me.destroy();
+		}
+	}
+
+	me.destroy = function() {
+		gameObjects.splice(gameObjects.indexOf(me), 1);
+		me.healthBar.destroy();
+		me.healthBarBackground.destroy();
+	}
 }
 
 function Enemy(x, y) {
@@ -221,15 +293,23 @@ function Enemy(x, y) {
 	me.tags.push('enemy');
 
 	me.speed = 1;
+	
+	me.grounded = false;
 
 	me.think = function() {
-		if(me.position.x > player.position.x) {
+		if (me.position.x > player.position.x) {
 			me.position.x -= me.speed;
-		} else if(me.position.x < player.position.x) {
+		} 
+		else if (me.position.x < player.position.x) {
 			me.position.x += me.speed;
+		}
+		if (me.position.y < player.position.y && player.grounded && me.grounded) {
+			me.velocity.y = 10;
+			// player.position.y += 1;
+			me.grounded = false;
 		}
 
 		// where's the player's y? is it above us? are they grounded? if so, jump to them maybe if we're a dog.
-		// or if we're a gunner, keep a distance
+		//or if we're a gunner, keep a distance
 	}
 }
