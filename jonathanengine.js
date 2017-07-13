@@ -18,7 +18,9 @@ var projectileSpeed = 10;
 window.addEventListener('mousedown', mouseDown);
 function mouseDown(event) {
 	var projectile = new Projectile(player.position.x, player.position.y, 'rgb(200, 200, 0)');
-	var mousePosition = new Vector2D(event.clientX, -event.clientY);
+	var mousePosition = new Vector2D(event.clientX + player.position.x - 500, -event.clientY + player.position.y + 500);
+
+	// worldToLocal();
 
 	var differenceVector = mousePosition.subtract(player.position);
 	differenceVector.normalize();
@@ -217,8 +219,10 @@ function Vector2D(x, y) {
 	}
 
 	me.normalize = function() {
-		me.x /= this.getMagnitude();
-		me.y /= this.getMagnitude();
+		var magnitude = me.getMagnitude();
+
+		me.x /= magnitude;
+		me.y /= magnitude;
 	}
 }
 
