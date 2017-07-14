@@ -9,6 +9,8 @@ gamescreen.width = windowWidth;
 gamescreen.height = windowHeight;
 var tools = gamescreen.getContext('2d');
 
+var coins = 0;
+
 var gravityForce = 0.4;
 var xDirection = 0;
 var yDirection = 0;
@@ -18,14 +20,17 @@ var projectileSpeed = 10;
 window.addEventListener('mousedown', mouseDown);
 function mouseDown(event) {
 	var projectile = new Projectile(player.position.x, player.position.y, 'rgb(200, 200, 0)');
-	var mousePosition = new Vector2D(event.clientX + player.position.x - 500, -event.clientY + player.position.y + 500);
 
-	// worldToLocal();
+	var mousePosition = localToWorld(new Vector2D(event.clientX, -event.clientY));
 
 	var differenceVector = mousePosition.subtract(player.position);
 	differenceVector.normalize();
 
 	projectile.velocity = differenceVector.multiply(projectileSpeed);
+}
+
+function localToWorld(vector) {
+	return new Vector2D(vector.x + player.position.x - 500, vector.y + player.position.y + 500);
 }
 
 window.addEventListener('keyup', keyUp);
@@ -83,15 +88,48 @@ var gameObjects = [];
 var player = new Character(0, -200, 'purple');
 var rock = new GameObject(100, 10, 5, 5, 'gray');
 var tree = new GameObject(50, 40, 20, 100, 'green');
-var ground1 = new GameObject(0, -525, 1000, 10, 'purple');
-ground1.static = true;
-var ground2 = new GameObject(300, -425, 1000, 10, 'blue');
-ground2.static = true;
-var ground3 = new GameObject(150, -237, 200, 10, 'red');
-ground3.static = true;
-var ground4 = new GameObject(800, -237, 200, 10, 'red');
-ground4.static = true;
-var enemy1 = new Enemy(300, 0);
+// var ground1 = new GameObject(0, -525, 1000, 10, 'purple');
+// ground1.static = true;
+// var ground2 = new GameObject(300, -425, 1000, 10, 'blue');
+// ground2.static = true;
+// var ground3 = new GameObject(150, -237, 200, 10, 'red');
+// ground3.static = true;
+// var ground4 = new GameObject(800, -237, 200, 10, 'red');
+// ground4.static = true;
+// var enemy1 = new Enemy(300, 0);
+
+generateLevel();
+
+function generateLevel () {
+	var xOffset = 0;
+	var currentY = -700;
+	for (var index = 0; index < 10; index++) {
+		var randomWidth = 50 + Math.floor(Math.random() * 1950);
+		var xRange = 325;
+		var yRange = 376;
+		var randomY = (currentY - yRange/2) + Math.floor(Math.random() * yRange);
+
+		var ground1 = new GameObject(xOffset, randomY, randomWidth, 10, 'purple');
+		ground1.static = true;
+
+		xOffset += randomWidth;
+		xOffset += Math.random() * xRange;
+		currentY = randomY;
+	}
+
+	for (var index = 0; index < 5; index++) {
+		// var randomWidth = 50 + Math.floor(Math.random() * 1950);
+		// var xRange = 325;
+		// var yRange = 376;
+		// var randomY = (currentY - yRange/2) + Math.floor(Math.random() * yRange);
+
+		var enemy = new Enemy(Math.random() * xOffset, -100);
+
+		// xOffset += randomWidth;
+		// xOffset += Math.random() * xRange;
+		// currentY = randomY;
+	}
+}
 
 function update() {
 	player.position.x += xDirection * playerSpeed;
@@ -125,6 +163,11 @@ function update() {
 						gameObject.velocity.y = 0;
 						gameObject.position.y = colliderObject.position.y + gameObject.h;
 					// }
+				}
+
+				if(gameObject == player && colliderObject.tags.indexOf('coin') != -1) {
+					colliderObject.destroy();
+					coins++;
 				}
 
 				if(gameObject.tags.indexOf('enemy') != -1) {
@@ -171,6 +214,9 @@ function update() {
 		}
 	}
 
+	tools.fillStyle = 'black';
+	tools.font = '36px Arial';
+	tools.fillText(coins, 0, 36);
 
 	setTimeout(update, 10);
 }
@@ -278,6 +324,11 @@ function Character(x, y, color) {
 		me.healthBar.w = (me.health / me.maxHealth) * me.w;
 
 		if(me.health <= 0) {
+			if(me.tags.indexOf('enemy') != -1) {
+				var coin = new GameObject(me.position.x, me.position.y + 25, 25, 25, 'yellow');
+				coin.tags.push('coin');
+			}
+
 			me.destroy();
 		}
 	}
