@@ -1,6 +1,14 @@
-// 
+// TODO
+// sprites
+// different weapons
+// what do we spend coins on?
+// more enemies
+// boss?
 
 var gamescreen = document.getElementById('gameScreen');
+
+var uiObjects = [];
+
 
 var windowWidth = document.body.offsetWidth;
 var windowHeight = document.body.offsetHeight;
@@ -17,20 +25,44 @@ var yDirection = 0;
 var playerSpeed = 10;
 var projectileSpeed = 10;
 
+var pausing = false;
+
+var mousing = false;
+var mouseX = 0;
+var mouseY = 0;
+
 window.addEventListener('mousedown', mouseDown);
 function mouseDown(event) {
-	var projectile = new Projectile(player.position.x, player.position.y, 'rgb(200, 200, 0)');
+	mousing = true;
 
-	var mousePosition = localToWorld(new Vector2D(event.clientX, -event.clientY));
+	for(var index = 0; index < uiObjects.length; index++) {
+		var uiObject = uiObjects[index];
 
-	var differenceVector = mousePosition.subtract(player.position);
-	differenceVector.normalize();
+		var mouseObject = new GameObject(mouseX, mouseY, 10, 10);
+		var uiButtonObject = new GameObject(uiObject.x, uiObject.y, 300, 50);
 
-	projectile.velocity = differenceVector.multiply(projectileSpeed);
+		if(checkCollision(mouseObject, uiButtonObject)) {
+			pausing = false;
+		}
+
+		mouseObject.destroy();
+		uiButtonObject.destroy();
+	}
+}
+
+window.addEventListener('mousemove', mouseMove);
+function mouseMove(event) {
+	mouseX = event.clientX;
+	mouseY = -event.clientY;
+}
+
+window.addEventListener('mouseup', mouseUp);
+function mouseUp(event) {
+	mousing = false;
 }
 
 function localToWorld(vector) {
-	return new Vector2D(vector.x + player.position.x - 500, vector.y + player.position.y + 500);
+	return new Vector2D(vector.x + player.position.x - windowWidth / 2, vector.y + player.position.y + windowHeight / 2);
 }
 
 window.addEventListener('keyup', keyUp);
@@ -81,6 +113,23 @@ function keyDown(event) {
 		// we hit S
 		// yDirection = -1;
 	}
+	if(event.keyCode == 27) {
+		// esc
+		openPauseMenu();
+	}
+}
+
+var resumeButton = new UIObject(10, -100);
+resumeButton.text = 'Resume';
+resumeButton.positioning = 'center';
+
+// var optionsBullet = new UIObject();
+// new UIWindow();
+// resume
+// 
+
+function openPauseMenu() {
+	pausing = true;
 }
 
 var gameObjects = [];
@@ -131,11 +180,47 @@ function generateLevel () {
 	}
 }
 
+function shoot() {
+	var projectile = new Projectile(player.position.x, player.position.y, 'rgb(200, 200, 0)');
+
+	var mousePosition = localToWorld(new Vector2D(mouseX, mouseY));
+
+	var differenceVector = mousePosition.subtract(player.position);
+	differenceVector.normalize();
+
+	projectile.velocity = differenceVector.multiply(projectileSpeed);
+}
+
 function update() {
+	if(pausing) {
+		return;
+	}
+
+	tools.clearRect(0, 0, windowWidth, windowHeight);
+
 	player.position.x += xDirection * playerSpeed;
 	player.position.y += yDirection * playerSpeed;
 
-	tools.clearRect(0, 0, windowWidth, windowHeight);
+	var currentTime = new Date();
+
+	if(mousing && currentTime - player.lastShot > 1000 / player.fireRate) {
+		shoot();
+		player.lastShot = currentTime;
+	}
+
+	for(var index = 0; index < uiObjects.length; index++) {
+		var uiObject = uiObjects[index];
+		if(uiObject.text != null) {
+			if(uiObject.positioning == 'center') {
+				var measurement = tools.measureText(uiObject.text);
+				;
+
+				tools.fillText(uiObject.text, windowWidth / 2 - measurement.width / 2, -uiObject.y);
+			} else {
+				tools.fillText(uiObject.text, uiObject.x, -uiObject.y);
+			}
+		}
+	}
 
 	for(var index = 0; index < gameObjects.length; index++) {
 		var gameObject = gameObjects[index];
@@ -196,12 +281,15 @@ function update() {
 			drawY += gameObject.relative.position.y;
 		}
 
+		var offsetX = windowWidth / 2;
+		var offsetY = windowHeight / 2;
+
 		if(gameObject != player) {
-			drawX -= player.position.x - 500;
-			drawY -= player.position.y + 500;
+			drawX -= player.position.x - offsetX;
+			drawY -= player.position.y + offsetY;
 		} else {
-			drawX = 500;
-			drawY = -500;
+			drawX = offsetX;
+			drawY = -offsetY;
 		}
 
 		// Actually do the move
@@ -272,6 +360,14 @@ function Vector2D(x, y) {
 	}
 }
 
+function UIObject(x, y, type) {
+	// GameObject.call(this, x, y, 5, 5, "purple");
+	this.x = x;
+	this.y = y;
+	this.positioning = null;
+	uiObjects.push(this);
+}
+
 function GameObject(x, y, w, h, color) {
 	var me = this;
 	me.position = new Vector2D(x, y);
@@ -307,6 +403,10 @@ function Character(x, y, color) {
 	GameObject.call(this, x, y, 50, 50, color);
 
 	var me = this;
+
+	me.speed = 1;
+	me.fireRate = 2;
+	me.lastShot = new Date();
 
 	me.health = 100;
 	me.maxHealth = me.health;
@@ -347,8 +447,6 @@ function Enemy(x, y) {
 
 	me.tags.push('enemy');
 
-	me.speed = 1;
-	
 	me.grounded = false;
 
 	me.think = function() {
