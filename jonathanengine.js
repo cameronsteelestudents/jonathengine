@@ -41,8 +41,16 @@ function mouseDown(event) {
 		var mouseObject = new GameObject(mouseX, mouseY, 10, 10);
 		var uiButtonObject = new GameObject(uiObject.x, uiObject.y, 300, 50);
 
+		if(uiObject.positioning == 'center') {
+			uiButtonObject.position.x += (gamescreen.width / 2) - (uiObject.textMeasurement / 2);
+		}
+
+		console.log([uiButtonObject.position.x, uiButtonObject.position.y]);
+		console.log([mouseObject.position.x, mouseObject.position.y]);
+
 		if(checkCollision(mouseObject, uiButtonObject)) {
 			pausing = false;
+			update();
 		}
 
 		mouseObject.destroy();
@@ -213,8 +221,7 @@ function update() {
 		if(uiObject.text != null) {
 			if(uiObject.positioning == 'center') {
 				var measurement = tools.measureText(uiObject.text);
-				;
-
+				uiObject.textMeasurement = measurement.width;
 				tools.fillText(uiObject.text, windowWidth / 2 - measurement.width / 2, -uiObject.y);
 			} else {
 				tools.fillText(uiObject.text, uiObject.x, -uiObject.y);
@@ -364,6 +371,7 @@ function UIObject(x, y, type) {
 	// GameObject.call(this, x, y, 5, 5, "purple");
 	this.x = x;
 	this.y = y;
+	this.textMeasurement = 0;
 	this.positioning = null;
 	uiObjects.push(this);
 }
