@@ -2,7 +2,9 @@
 // sprites
 // different weapons
 // what do we spend coins on?
+// shop items
 // more enemies
+	// enemies shooting
 // boss?
 
 var gamescreen = document.getElementById('gameScreen');
@@ -35,8 +37,12 @@ window.addEventListener('mousedown', mouseDown);
 function mouseDown(event) {
 	mousing = true;
 
-	for(var index = 0; index < uiObjects.length; index++) {
-		var uiObject = uiObjects[index];
+	for(var uiIndex = 0; uiIndex < uiObjects.length; uiIndex++) {
+		var uiObject = uiObjects[uiIndex];
+
+		if(!uiObject.active) {
+			continue;
+		}
 
 		var mouseObject = new GameObject(mouseX, mouseY, 10, 10);
 		var uiButtonObject = new GameObject(uiObject.x, uiObject.y, 300, 50);
@@ -45,12 +51,12 @@ function mouseDown(event) {
 			uiButtonObject.position.x += (gamescreen.width / 2) - (uiObject.textMeasurement / 2);
 		}
 
-		console.log([uiButtonObject.position.x, uiButtonObject.position.y]);
-		console.log([mouseObject.position.x, mouseObject.position.y]);
-
 		if(checkCollision(mouseObject, uiButtonObject)) {
-			pausing = false;
-			update();
+			uiObject.clickCallbacks
+			for(var callbackIndex = 0; callbackIndex < uiObject.clickCallbacks.length; callbackIndex++) {
+				var clickCallback = uiObject.clickCallbacks[callbackIndex];
+				clickCallback();
+			}
 		}
 
 		mouseObject.destroy();
@@ -130,6 +136,21 @@ function keyDown(event) {
 var resumeButton = new UIObject(10, -100);
 resumeButton.text = 'Resume';
 resumeButton.positioning = 'center';
+resumeButton.active = false;
+resumeButton.clickCallbacks.push(function() {
+	pausing = false;
+	update();
+});
+
+var shopButton = new UIObject(10, -125);
+shopButton.text = 'Shop';
+shopButton.active = false;
+shopButton.positioning = 'center';
+shopButton.clickCallbacks.push(function(){
+
+});
+
+
 
 // var optionsBullet = new UIObject();
 // new UIWindow();
@@ -138,6 +159,8 @@ resumeButton.positioning = 'center';
 
 function openPauseMenu() {
 	pausing = true;
+	resumeButton.active = true;
+	shopButton.active = true;
 }
 
 var gameObjects = [];
@@ -200,6 +223,24 @@ function shoot() {
 }
 
 function update() {
+	for(var index = 0; index < uiObjects.length; index++) {
+		var uiObject = uiObjects[index];
+
+		if (!uiObject.active) {
+			continue;
+		}
+
+		if(uiObject.text != null) {
+			if(uiObject.positioning == 'center') {
+				var measurement = tools.measureText(uiObject.text);
+				uiObject.textMeasurement = measurement.width;
+				tools.fillText(uiObject.text, windowWidth / 2 - measurement.width / 2, -uiObject.y);
+			} else {
+				tools.fillText(uiObject.text, uiObject.x, -uiObject.y);
+			}
+		}
+	}
+
 	if(pausing) {
 		return;
 	}
@@ -216,24 +257,20 @@ function update() {
 		player.lastShot = currentTime;
 	}
 
-	for(var index = 0; index < uiObjects.length; index++) {
-		var uiObject = uiObjects[index];
-		if(uiObject.text != null) {
-			if(uiObject.positioning == 'center') {
-				var measurement = tools.measureText(uiObject.text);
-				uiObject.textMeasurement = measurement.width;
-				tools.fillText(uiObject.text, windowWidth / 2 - measurement.width / 2, -uiObject.y);
-			} else {
-				tools.fillText(uiObject.text, uiObject.x, -uiObject.y);
-			}
-		}
-	}
-
 	for(var index = 0; index < gameObjects.length; index++) {
 		var gameObject = gameObjects[index];
 
 		if(gameObject.tags.indexOf('enemy') != -1) {
 			gameObject.think();
+		}
+
+		if(gameObject.tags.indexOf('projectile') != -1) {
+			var differenceVector = player.position.subtract(gameObject.position);
+			var distance = differenceVector.getMagnitude();
+			if(distance >= 10000) {
+				gameObject.destroy();
+				index--;
+			}
 		}
 
 		gameObject.position = gameObject.position.add(gameObject.velocity);
@@ -371,8 +408,10 @@ function UIObject(x, y, type) {
 	// GameObject.call(this, x, y, 5, 5, "purple");
 	this.x = x;
 	this.y = y;
+	this.active = true;
 	this.textMeasurement = 0;
 	this.positioning = null;
+	this.clickCallbacks = [];
 	uiObjects.push(this);
 }
 
@@ -453,22 +492,29 @@ function Enemy(x, y) {
 
 	var me = this;
 
+	me.visionRadius = 500;
+
 	me.tags.push('enemy');
 
 	me.grounded = false;
 
 	me.think = function() {
-		if (me.position.x > player.position.x) {
-			me.position.x -= me.speed;
-		} 
-		else if (me.position.x < player.position.x) {
-			me.position.x += me.speed;
+		var differenceVector = me.position.subtract(player.position);
+		var distance = differenceVector.getMagnitude();
+		if(distance < me.visionRadius) {
+			if (me.position.x > player.position.x) {
+				me.position.x -= me.speed;
+			} else if (me.position.x < player.position.x) {
+				me.position.x += me.speed;
+			}
+
+			if (me.position.y < player.position.y && player.grounded && me.grounded) {
+				me.velocity.y = 10;
+				// player.position.y += 1;
+				me.grounded = false;
+			}
 		}
-		if (me.position.y < player.position.y && player.grounded && me.grounded) {
-			me.velocity.y = 10;
-			// player.position.y += 1;
-			me.grounded = false;
-		}
+
 
 		// where's the player's y? is it above us? are they grounded? if so, jump to them maybe if we're a dog.
 		//or if we're a gunner, keep a distance
