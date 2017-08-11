@@ -1,7 +1,9 @@
+// Added agroRadius and enemies shooting (kind of)
 // TODO
 // sprites
 // different weapons
 // what do we spend coins on?
+// accuracy
 // shop items
 // more enemies
 	// enemies shooting
@@ -178,6 +180,12 @@ var tree = new GameObject(50, 40, 20, 100, 'green');
 // ground4.static = true;
 // var enemy1 = new Enemy(300, 0);
 
+var pixelPistol = new Weapon("Pixel Pistol", 100, 10, 0, 2);
+var uzi = new Weapon('UZI', 50, 10, 100, 4);
+var launcher = new Weapon('Launcher', 50, 50, 50, 50);
+launcher.kinematic = false;
+player.activeWeapon = launcher;
+
 generateLevel();
 
 function generateLevel () {
@@ -212,14 +220,46 @@ function generateLevel () {
 }
 
 function shoot() {
-	var projectile = new Projectile(player.position.x, player.position.y, 'rgb(200, 200, 0)');
+	var currentTime = new Date();
 
-	var mousePosition = localToWorld(new Vector2D(mouseX, mouseY));
+	if(currentTime - player.lastShot > 1000 / player.activeWeapon.fireRate) {
+		switch(player.activeWeapon) {
+			case pixelPistol:
+			case uzi: {
+				var projectile = new Projectile(player.position.x, player.position.y, 5, 5, 'rgb(200, 200, 0)');
 
-	var differenceVector = mousePosition.subtract(player.position);
-	differenceVector.normalize();
+				var mousePosition = localToWorld(new Vector2D(mouseX, mouseY));
 
-	projectile.velocity = differenceVector.multiply(projectileSpeed);
+				var spread = 100 - player.activeWeapon.accuracy;
+				mousePosition.x += spread - Math.random() * spread * 2;
+				mousePosition.y += spread - Math.random() * spread * 2;
+
+				var differenceVector = mousePosition.subtract(player.position);
+				differenceVector.normalize();
+
+				projectile.velocity = differenceVector.multiply(player.activeWeapon.projectileSpeed);
+			} break;
+
+			case launcher: {
+				var projectile = new Projectile(player.position.x, player.position.y, 25, 25, 'rgb(0, 0, 200)');
+				projectile.kinematic = player.activeWeapon.kinematic;
+
+				var mousePosition = localToWorld(new Vector2D(mouseX, mouseY));
+
+				var spread = 100 - player.activeWeapon.accuracy;
+				mousePosition.x += spread - Math.random() * spread * 2;
+				mousePosition.y += spread - Math.random() * spread * 2;
+
+				var differenceVector = mousePosition.subtract(player.position);
+				differenceVector.normalize();
+				projectile.velocity = differenceVector.multiply(player.activeWeapon.projectileSpeed);
+			} break;
+		}
+
+		player.lastShot = currentTime;
+	}
+
+
 }
 
 function update() {
@@ -252,9 +292,9 @@ function update() {
 
 	var currentTime = new Date();
 
-	if(mousing && currentTime - player.lastShot > 1000 / player.fireRate) {
+	if(mousing) {
 		shoot();
-		player.lastShot = currentTime;
+
 	}
 
 	for(var index = 0; index < gameObjects.length; index++) {
@@ -294,14 +334,20 @@ function update() {
 					// }
 				}
 
+
 				if(gameObject == player && colliderObject.tags.indexOf('coin') != -1) {
 					colliderObject.destroy();
 					coins++;
 				}
+				
+				if(gameObject == player && colliderObject.tags.indexOf('enemyProjectile') != -1) {
+					gameObject.changeHealth(-10);
+					colliderObject.destroy();
+				}
 
 				if(gameObject.tags.indexOf('enemy') != -1) {
-					if(colliderObject.tags.indexOf('projectile') != -1) {
-						gameObject.changeHealth(-10);
+					if(colliderObject.tags.indexOf('playerProjectile') != -1) {
+						gameObject.changeHealth(-player.activeWeapon.damage);
 						colliderObject.destroy();
 					}
 
@@ -310,6 +356,12 @@ function update() {
 					}
 				}
 			}
+		}
+
+		if (gameObject.tags.indexOf('projectile') != -1 && staticCollision) {
+			gameObject.destroy();
+			index--;
+			continue;
 		}
 
 		// If not "grounded", let gravity do its thing
@@ -415,6 +467,17 @@ function UIObject(x, y, type) {
 	uiObjects.push(this);
 }
 
+function Weapon(name, accuracy, damage, price, fireRate) {
+	var me = this;
+	me.name = name;
+	me.accuracy = accuracy;
+	me.damage = damage;
+	me.price = price;
+	me.fireRate = fireRate;
+	me.kinematic = true;
+	me.projectileSpeed = 10;
+}
+
 function GameObject(x, y, w, h, color) {
 	var me = this;
 	me.position = new Vector2D(x, y);
@@ -435,11 +498,24 @@ function GameObject(x, y, w, h, color) {
 	gameObjects.push(me);
 }
 
-function Projectile(x, y, color) {
-	GameObject.call(this, x, y, 5, 5, "purple");
+function Projectile(x, y, width, height, color) {
+	GameObject.call(this, x, y, width, height, "purple");
 
 	var me = this;
 	me.kinematic = true;
+	me.tags.push('playerProjectile');
+	me.tags.push('projectile');
+
+	// me.static = true;
+	// me.grounded = true;
+}
+
+function EnemyProjectile(x, y, width, height, color) {
+	GameObject.call(this, x, y, width, height, "red");
+
+	var me = this;
+	me.kinematic = true;
+	me.tags.push('enemyProjectile');
 	me.tags.push('projectile');
 
 	// me.static = true;
@@ -451,6 +527,7 @@ function Character(x, y, color) {
 
 	var me = this;
 
+	me.activeWeapon = null;
 	me.speed = 1;
 	me.fireRate = 2;
 	me.lastShot = new Date();
@@ -491,17 +568,47 @@ function Enemy(x, y) {
 	Character.call(this, x, y, 'rgba(200, 0, 0, 0.5)');
 
 	var me = this;
+	
+	me.fireRate = 0.75;
 
 	me.visionRadius = 500;
+	
+	me.agroRadius = 1000;
+	
+	me.following = false
 
 	me.tags.push('enemy');
-
+ 
 	me.grounded = false;
+	
+	me.enemyShoot = function() {
+		var projectile = new EnemyProjectile(me.position.x, me.position.y, 10, 10, 'rgb(200, 0, 0)');
+
+		var spread = 25;
+		var offsetVector = new Vector2D(spread - Math.random() * spread * 2, spread - Math.random() * spread * 2);
+		var targetVector = player.position.add(offsetVector)
+		var differenceVector = targetVector.subtract(me.position);
+
+		differenceVector.normalize();
+
+		projectile.velocity = differenceVector.multiply(projectileSpeed);
+	}
 
 	me.think = function() {
 		var differenceVector = me.position.subtract(player.position);
 		var distance = differenceVector.getMagnitude();
 		if(distance < me.visionRadius) {
+			me.following = true;
+		}
+		
+		var enemyTime = new Date();
+
+		if(me.following == true && enemyTime - me.lastShot > 1000 / me.fireRate) {
+			me.enemyShoot();
+			me.lastShot = enemyTime;
+		}
+		
+		if (me.following == true) {
 			if (me.position.x > player.position.x) {
 				me.position.x -= me.speed;
 			} else if (me.position.x < player.position.x) {
@@ -514,9 +621,8 @@ function Enemy(x, y) {
 				me.grounded = false;
 			}
 		}
-
-
-		// where's the player's y? is it above us? are they grounded? if so, jump to them maybe if we're a dog.
-		//or if we're a gunner, keep a distance
+		if (distance > me.agroRadius) {
+			me.following = false;
+		}
 	}
 }
