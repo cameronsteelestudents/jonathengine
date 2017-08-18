@@ -1,4 +1,3 @@
-// Added agroRadius and enemies shooting (kind of)
 // TODO
 // sprites
 // different weapons
@@ -182,8 +181,9 @@ var tree = new GameObject(50, 40, 20, 100, 'green');
 
 var pixelPistol = new Weapon("Pixel Pistol", 100, 10, 0, 2);
 var uzi = new Weapon('UZI', 50, 10, 100, 4);
-var launcher = new Weapon('Launcher', 50, 50, 50, 50);
+var launcher = new Weapon('Launcher', 100, 50, 50, 5);
 launcher.kinematic = false;
+launcher.projectileSpeed = 30;
 player.activeWeapon = launcher;
 
 generateLevel();
@@ -243,6 +243,7 @@ function shoot() {
 			case launcher: {
 				var projectile = new Projectile(player.position.x, player.position.y, 25, 25, 'rgb(0, 0, 200)');
 				projectile.kinematic = player.activeWeapon.kinematic;
+				projectile.tags.push('launcherProjectile');
 
 				var mousePosition = localToWorld(new Vector2D(mouseX, mouseY));
 
@@ -252,6 +253,7 @@ function shoot() {
 
 				var differenceVector = mousePosition.subtract(player.position);
 				differenceVector.normalize();
+
 				projectile.velocity = differenceVector.multiply(player.activeWeapon.projectileSpeed);
 			} break;
 		}
@@ -327,10 +329,19 @@ function update() {
 			if(checkCollision(gameObject, colliderObject)) {
 				if(!gameObject.static && colliderObject.static == true) {
 					// if(!gameObject.grounded) {
+					if(gameObject.tags.indexOf('launcherProjectile') != -1) {
+						/// bounciness maybe bigger magnitude == bigger bounce
+						gameObject.velocity.y *= -0.6 ;
+						gameObject.velocity.x *= 0.9;
+						if(gameObject.velocity.getMagnitude() < 0.1) {
+							gameObject.destroy();
+						}
+					} else {
 						gameObject.grounded = true;
 						staticCollision = true;
 						gameObject.velocity.y = 0;
 						gameObject.position.y = colliderObject.position.y + gameObject.h;
+					}
 					// }
 				}
 
