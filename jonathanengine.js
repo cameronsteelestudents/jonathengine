@@ -1,4 +1,3 @@
-// Added agroRadius and enemies shooting (kind of)
 // TODO
 // sprites
 // different weapons
@@ -12,7 +11,7 @@
 var gamescreen = document.getElementById('gameScreen');
 
 var uiObjects = [];
-
+var buyButtons = [];
 
 var windowWidth = document.body.offsetWidth;
 var windowHeight = document.body.offsetHeight;
@@ -21,8 +20,9 @@ gamescreen.width = windowWidth;
 gamescreen.height = windowHeight;
 var tools = gamescreen.getContext('2d');
 
-var coins = 0;
+var coins = 100;
 
+var shopItemXOffset = -300;
 var gravityForce = 0.4;
 var xDirection = 0;
 var yDirection = 0;
@@ -47,14 +47,13 @@ function mouseDown(event) {
 		}
 
 		var mouseObject = new GameObject(mouseX, mouseY, 10, 10);
-		var uiButtonObject = new GameObject(uiObject.x, uiObject.y, 300, 50);
+		var uiButtonObject = new GameObject(uiObject.x, uiObject.y, 300, 36);
 
 		if(uiObject.positioning == 'center') {
 			uiButtonObject.position.x += (gamescreen.width / 2) - (uiObject.textMeasurement / 2);
 		}
 
 		if(checkCollision(mouseObject, uiButtonObject)) {
-			uiObject.clickCallbacks
 			for(var callbackIndex = 0; callbackIndex < uiObject.clickCallbacks.length; callbackIndex++) {
 				var clickCallback = uiObject.clickCallbacks[callbackIndex];
 				clickCallback();
@@ -141,23 +140,24 @@ resumeButton.positioning = 'center';
 resumeButton.active = false;
 resumeButton.clickCallbacks.push(function() {
 	pausing = false;
-	update();
+	resumeButton.active = false;
+	shopButton.active = false;
 });
 
-var shopButton = new UIObject(10, -125);
+var shopButton = new UIObject(10, -150);
 shopButton.text = 'Shop';
 shopButton.active = false;
 shopButton.positioning = 'center';
 shopButton.clickCallbacks.push(function(){
-
+	for(var buttonIndex = 0; buttonIndex < buyButtons.length; buttonIndex++) {
+		var buyButton = buyButtons[buttonIndex];
+		buyButton.active = true;
+	}
 });
-
-
 
 // var optionsBullet = new UIObject();
 // new UIWindow();
 // resume
-// 
 
 function openPauseMenu() {
 	pausing = true;
@@ -182,8 +182,9 @@ var tree = new GameObject(50, 40, 20, 100, 'green');
 
 var pixelPistol = new Weapon("Pixel Pistol", 100, 10, 0, 2);
 var uzi = new Weapon('UZI', 50, 10, 100, 4);
-var launcher = new Weapon('Launcher', 50, 50, 50, 50);
+var launcher = new Weapon('Launcher', 100, 50, 50, 5);
 launcher.kinematic = false;
+launcher.projectileSpeed = 30;
 player.activeWeapon = launcher;
 
 generateLevel();
@@ -243,6 +244,7 @@ function shoot() {
 			case launcher: {
 				var projectile = new Projectile(player.position.x, player.position.y, 25, 25, 'rgb(0, 0, 200)');
 				projectile.kinematic = player.activeWeapon.kinematic;
+				projectile.tags.push('launcherProjectile');
 
 				var mousePosition = localToWorld(new Vector2D(mouseX, mouseY));
 
@@ -252,6 +254,7 @@ function shoot() {
 
 				var differenceVector = mousePosition.subtract(player.position);
 				differenceVector.normalize();
+
 				projectile.velocity = differenceVector.multiply(player.activeWeapon.projectileSpeed);
 			} break;
 		}
@@ -263,6 +266,11 @@ function shoot() {
 }
 
 function update() {
+	tools.clearRect(0, 0, windowWidth, windowHeight);
+
+	tools.fillStyle = 'black';
+	tools.font = '36px Arial';
+	tools.fillText(coins, 0, 36);
 	for(var index = 0; index < uiObjects.length; index++) {
 		var uiObject = uiObjects[index];
 
@@ -274,18 +282,18 @@ function update() {
 			if(uiObject.positioning == 'center') {
 				var measurement = tools.measureText(uiObject.text);
 				uiObject.textMeasurement = measurement.width;
-				tools.fillText(uiObject.text, windowWidth / 2 - measurement.width / 2, -uiObject.y);
+				tools.fillText(uiObject.text, (windowWidth / 2 - measurement.width / 2) + (uiObject.x), -uiObject.y);
 			} else {
 				tools.fillText(uiObject.text, uiObject.x, -uiObject.y);
 			}
 		}
 	}
 
+
 	if(pausing) {
+		setTimeout(update, 10);
 		return;
 	}
-
-	tools.clearRect(0, 0, windowWidth, windowHeight);
 
 	player.position.x += xDirection * playerSpeed;
 	player.position.y += yDirection * playerSpeed;
@@ -294,7 +302,6 @@ function update() {
 
 	if(mousing) {
 		shoot();
-
 	}
 
 	for(var index = 0; index < gameObjects.length; index++) {
@@ -327,10 +334,19 @@ function update() {
 			if(checkCollision(gameObject, colliderObject)) {
 				if(!gameObject.static && colliderObject.static == true) {
 					// if(!gameObject.grounded) {
+					if(gameObject.tags.indexOf('launcherProjectile') != -1) {
+						/// bounciness maybe bigger magnitude == bigger bounce
+						gameObject.velocity.y *= -0.6 ;
+						gameObject.velocity.x *= 0.9;
+						if(gameObject.velocity.getMagnitude() < 0.1) {
+							gameObject.destroy();
+						}
+					} else {
 						gameObject.grounded = true;
 						staticCollision = true;
 						gameObject.velocity.y = 0;
 						gameObject.position.y = colliderObject.position.y + gameObject.h;
+					}
 					// }
 				}
 
@@ -398,10 +414,6 @@ function update() {
 		}
 	}
 
-	tools.fillStyle = 'black';
-	tools.font = '36px Arial';
-	tools.fillText(coins, 0, 36);
-
 	setTimeout(update, 10);
 }
 
@@ -467,6 +479,11 @@ function UIObject(x, y, type) {
 	uiObjects.push(this);
 }
 
+// function ShopItem() {
+// 	var me = this;
+// }
+
+
 function Weapon(name, accuracy, damage, price, fireRate) {
 	var me = this;
 	me.name = name;
@@ -475,7 +492,31 @@ function Weapon(name, accuracy, damage, price, fireRate) {
 	me.price = price;
 	me.fireRate = fireRate;
 	me.kinematic = true;
+	me.purchased = false;
 	me.projectileSpeed = 10;
+
+	if(me.price > 0) {
+		var buyButton = new UIObject(shopItemXOffset, -200);
+		buyButton.text = me.name;
+		buyButton.active = false;
+		buyButton.positioning = 'center';
+		buyButtons.push(buyButton);
+
+		buyButton.clickCallbacks.push(function() {
+			if (me.purchased){
+				player.activeWeapon = me;
+
+			} else {
+				if(coins >= me.price) {
+					coins -= me.price;
+					me.purchased = true;
+					buyButton = me.name + ' (purchased)';
+				}
+			}
+		});
+
+		shopItemXOffset += 150;
+	}
 }
 
 function GameObject(x, y, w, h, color) {
