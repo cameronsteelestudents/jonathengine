@@ -2,7 +2,6 @@
 // sprites
 // different weapons
 // what do we spend coins on?
-// accuracy
 // shop items
 // more enemies
 	// enemies shooting
@@ -16,17 +15,19 @@ var buyButtons = [];
 var windowWidth = document.body.offsetWidth;
 var windowHeight = document.body.offsetHeight;
 
+var gameMode = 'editing';
+
 gamescreen.width = windowWidth;
 gamescreen.height = windowHeight;
 var tools = gamescreen.getContext('2d');
 
-var coins = 100;
+var coins = 50;
+var difficulty = 'normal';
 
 var shopItemXOffset = -300;
 var gravityForce = 0.4;
 var xDirection = 0;
 var yDirection = 0;
-var playerSpeed = 10;
 var projectileSpeed = 10;
 
 var pausing = false;
@@ -189,7 +190,7 @@ player.activeWeapon = launcher;
 
 generateLevel();
 
-function generateLevel () {
+function generateLevel() {
 	var xOffset = 0;
 	var currentY = -700;
 	for (var index = 0; index < 10; index++) {
@@ -206,7 +207,13 @@ function generateLevel () {
 		currentY = randomY;
 	}
 
-	for (var index = 0; index < 5; index++) {
+	var numberOfEnemies = 5;
+	if(difficulty == 'easy') {
+		numberOfEnemies = 3;
+	} else if(difficulty == 'hard') {
+		numberOfEnemies = 8;
+	}
+	for (var index = 0; index < numberOfEnemies; index++) {
 		// var randomWidth = 50 + Math.floor(Math.random() * 1950);
 		// var xRange = 325;
 		// var yRange = 376;
@@ -295,8 +302,8 @@ function update() {
 		return;
 	}
 
-	player.position.x += xDirection * playerSpeed;
-	player.position.y += yDirection * playerSpeed;
+	player.velocity.x += xDirection * player.acceleration;
+	// player.position.y += yDirection * player.speed;
 
 	var currentTime = new Date();
 
@@ -317,6 +324,18 @@ function update() {
 			if(distance >= 10000) {
 				gameObject.destroy();
 				index--;
+			}
+		}
+
+		if(gameObject.velocity.x > 0) {
+			if((gameObject.grounded || xDirection == -1) && xDirection != 1) {
+				gameObject.velocity.x -= gameObject.friction;
+			}
+		}
+
+		if(gameObject.velocity.x < 0) {
+			if((gameObject.grounded || xDirection == 1) && xDirection != -1) {
+				gameObject.velocity.x += gameObject.friction;
 			}
 		}
 
@@ -508,6 +527,7 @@ function Weapon(name, accuracy, damage, price, fireRate) {
 
 			} else {
 				if(coins >= me.price) {
+					console.log('somethin bought');
 					coins -= me.price;
 					me.purchased = true;
 					buyButton = me.name + ' (purchased)';
@@ -569,7 +589,9 @@ function Character(x, y, color) {
 	var me = this;
 
 	me.activeWeapon = null;
-	me.speed = 1;
+	me.speed = 4;
+	me.friction = 0.5;
+	me.acceleration = 0.2;
 	me.fireRate = 2;
 	me.lastShot = new Date();
 
@@ -614,19 +636,32 @@ function Enemy(x, y) {
 
 	me.visionRadius = 500;
 	
-	me.agroRadius = 1000;
+	me.agroRadius = 750;
 	
-	me.following = false
+	me.following = false;
+
+	me.spread = 25;
+
+	if(difficulty == 'easy') {
+		me.spread *= 1.5;
+		me.visionRadius = 400;
+		me.agroRadius = 500;
+	}
+
+	if(difficulty == 'hard') {
+		me.spread = 0;
+		me.visionRadius = 600;
+		me.agroRadius = 1000;
+	}
 
 	me.tags.push('enemy');
  
 	me.grounded = false;
-	
+
 	me.enemyShoot = function() {
 		var projectile = new EnemyProjectile(me.position.x, me.position.y, 10, 10, 'rgb(200, 0, 0)');
 
-		var spread = 25;
-		var offsetVector = new Vector2D(spread - Math.random() * spread * 2, spread - Math.random() * spread * 2);
+		var offsetVector = new Vector2D(me.spread - Math.random() * me.spread * 2, me.spread - Math.random() * me.spread * 2);
 		var targetVector = player.position.add(offsetVector)
 		var differenceVector = targetVector.subtract(me.position);
 
@@ -637,7 +672,18 @@ function Enemy(x, y) {
 
 	me.think = function() {
 		var differenceVector = me.position.subtract(player.position);
+
 		var distance = differenceVector.getMagnitude();
+
+		if(difficulty == 'easy') {
+			// less likely to attack player?
+			// slower 
+		} else if(difficulty == 'normal') {
+			// 
+		} else if(difficulty == 'hard') {
+
+		}
+
 		if(distance < me.visionRadius) {
 			me.following = true;
 		}
@@ -662,6 +708,7 @@ function Enemy(x, y) {
 				me.grounded = false;
 			}
 		}
+
 		if (distance > me.agroRadius) {
 			me.following = false;
 		}
