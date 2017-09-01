@@ -108,11 +108,11 @@ window.addEventListener('keydown', keyDown);
 function keyDown(event) {
 	if(event.keyCode == 68) {
 		// we hit D
-		xDirection = 0.75;
+		xDirection = 1;
 	}
 	if(event.keyCode == 65) {
 		// we hit A
-		xDirection = -0.75;
+		xDirection = -1;
 	}
 
 	if(event.keyCode == 87) {
@@ -302,6 +302,19 @@ function update() {
 		return;
 	}
 
+
+	if(player.velocity.x > 0) {
+		if(player.grounded && xDirection != 1) {
+			player.velocity.x -= player.friction;
+		}
+	}
+
+	if(player.velocity.x < 0) {
+		if(player.grounded && xDirection != -1) {
+			player.velocity.x += player.friction;
+		}
+	}
+
 	player.velocity.x += xDirection * player.acceleration;
 	// player.position.y += yDirection * player.speed;
 
@@ -327,17 +340,6 @@ function update() {
 			}
 		}
 
-		if(gameObject.velocity.x > 0) {
-			if((gameObject.grounded || xDirection == -1) && xDirection != 1) {
-				gameObject.velocity.x -= gameObject.friction;
-			}
-		}
-
-		if(gameObject.velocity.x < 0) {
-			if((gameObject.grounded || xDirection == 1) && xDirection != -1) {
-				gameObject.velocity.x += gameObject.friction;
-			}
-		}
 
 		gameObject.position = gameObject.position.add(gameObject.velocity);
 
