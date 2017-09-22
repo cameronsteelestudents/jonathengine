@@ -4,7 +4,6 @@
 // what do we spend coins on?
 // shop items
 // more enemies
-	// enemies shooting
 // boss?
 
 var gamescreen = document.getElementById('gameScreen');
@@ -168,7 +167,7 @@ function openPauseMenu() {
 
 var gameObjects = [];
 
-var player = new Character(0, -200, 'purple');
+var player = new Character(0, -200, 50, 50, 'purple');
 var rock = new GameObject(100, 10, 5, 5, 'gray');
 var tree = new GameObject(50, 40, 20, 100, 'green');
 // var ground1 = new GameObject(0, -525, 1000, 10, 'purple');
@@ -202,9 +201,14 @@ function generateLevel() {
 		var ground1 = new GameObject(xOffset, randomY, randomWidth, 10, 'purple');
 		ground1.static = true;
 
+		if(index == 3) {
+			// last platform
+			var boss = new Enemy(xOffset, randomY + 250, 'boss');
+		}
 		xOffset += randomWidth;
 		xOffset += Math.random() * xRange;
 		currentY = randomY;
+
 	}
 
 	var numberOfEnemies = 5;
@@ -303,20 +307,27 @@ function update() {
 	}
 
 
-	if(player.velocity.x > 0) {
+	if(player.velocity.x > 0) { // player is going right
 		if(player.grounded && xDirection != 1) {
 			player.velocity.x -= player.friction;
+			if(player.velocity < 0) {
+				player.velocity.x = 0;
+			}
 		}
 	}
 
 	if(player.velocity.x < 0) {
 		if(player.grounded && xDirection != -1) {
 			player.velocity.x += player.friction;
+			if(player.velocity.x > 0) {
+				player.velocity.x = 0;
+			}
 		}
 	}
-
-	player.velocity.x += xDirection * player.acceleration;
+	if(player.velocity.x <= 15) {
+		player.velocity.x += xDirection * player.acceleration;
 	// player.position.y += yDirection * player.speed;
+	}
 
 	var currentTime = new Date();
 
@@ -585,8 +596,8 @@ function EnemyProjectile(x, y, width, height, color) {
 	// me.grounded = true;
 }
 
-function Character(x, y, color) {
-	GameObject.call(this, x, y, 50, 50, color);
+function Character(x, y, w, h, color) {
+	GameObject.call(this, x, y, w, h, color);
 
 	var me = this;
 
@@ -629,12 +640,28 @@ function Character(x, y, color) {
 	}
 }
 
-function Enemy(x, y) {
-	Character.call(this, x, y, 'rgba(200, 0, 0, 0.5)');
+function Enemy(x, y, type) {
+	var width = 50;
+	var height = 50;
+
+	if(type == 'boss') {
+		width = 250;
+		height = 250;
+	}
+
+	Character.call(this, x, y, width, height, 'rgba(200, 0, 0, 0.5)');
 
 	var me = this;
 	
 	me.fireRate = 0.75;
+
+	me.firing = true;
+	me.burstCount = 5;
+	me.burstClip = 5;
+	me.burstDelay = 3;
+	me.lastBurst = new Date();
+
+	me.burstSpread = 1.5;
 
 	me.visionRadius = 500;
 	
@@ -661,58 +688,92 @@ function Enemy(x, y) {
 	me.grounded = false;
 
 	me.enemyShoot = function() {
-		var projectile = new EnemyProjectile(me.position.x, me.position.y, 10, 10, 'rgb(200, 0, 0)');
+		if(type == 'boss') {
+			var projectile = new EnemyProjectile(me.position.x, me.position.y, 20, 20, 'rgb(200, 0, 50)');
 
-		var offsetVector = new Vector2D(me.spread - Math.random() * me.spread * 2, me.spread - Math.random() * me.spread * 2);
-		var targetVector = player.position.add(offsetVector)
-		var differenceVector = targetVector.subtract(me.position);
+			var offsetVector = new Vector2D(me.burstSpread - Math.random() * me.burstSpread * 2, me.burstSpread - Math.random() * me.burstSpread * 2);
+			
+			var targetVector = player.position.add(offsetVector);
 
-		differenceVector.normalize();
+			var differenceVector = targetVector.subtract(me.position);
 
-		projectile.velocity = differenceVector.multiply(projectileSpeed);
+			differenceVector.normalize();
+
+			projectile.velocity = differenceVector.multiply(projectileSpeed);			
+		} else {
+			var projectile = new EnemyProjectile(me.position.x, me.position.y, 10, 10, 'rgb(200, 0, 0)');
+
+			var offsetVector = new Vector2D(me.spread - Math.random() * me.spread * 2, me.spread - Math.random() * me.spread * 2);
+			var targetVector = player.position.add(offsetVector)
+			var differenceVector = targetVector.subtract(me.position);
+
+			differenceVector.normalize();
+
+			projectile.velocity = differenceVector.multiply(projectileSpeed);
+		}
 	}
 
 	me.think = function() {
-		var differenceVector = me.position.subtract(player.position);
+		// switch(type) {
+		// 	case 'boss': {
 
-		var distance = differenceVector.getMagnitude();
+		// 	} break;
 
-		if(difficulty == 'easy') {
-			// less likely to attack player?
-			// slower 
-		} else if(difficulty == 'normal') {
-			// 
-		} else if(difficulty == 'hard') {
+		// 	default: {
+				var differenceVector = me.position.subtract(player.position);
 
-		}
+				var distance = differenceVector.getMagnitude();
 
-		if(distance < me.visionRadius) {
-			me.following = true;
-		}
-		
-		var enemyTime = new Date();
+				if(difficulty == 'easy') {
+					// less likely to attack player?
+					// slower 
+				} else if(difficulty == 'normal') {
+					// 
+				} else if(difficulty == 'hard') {
 
-		if(me.following == true && enemyTime - me.lastShot > 1000 / me.fireRate) {
-			me.enemyShoot();
-			me.lastShot = enemyTime;
-		}
-		
-		if (me.following == true) {
-			if (me.position.x > player.position.x) {
-				me.position.x -= me.speed;
-			} else if (me.position.x < player.position.x) {
-				me.position.x += me.speed;
-			}
+				}
 
-			if (me.position.y < player.position.y && player.grounded && me.grounded) {
-				me.velocity.y = 10;
-				// player.position.y += 1;
-				me.grounded = false;
-			}
-		}
+				if(distance < me.visionRadius) {
+					me.following = true;
+				}
+				
+				var enemyTime = new Date();
 
-		if (distance > me.agroRadius) {
-			me.following = false;
-		}
+				if(me.firing) {
+					if(me.following == true && enemyTime - me.lastShot > 1000 / me.fireRate) {
+						me.enemyShoot();
+						me.burstClip -= 1;
+						if(me.burstClip == 0) {
+							me.firing = false;
+							me.lastBurst = enemyTime;
+						}
+
+						me.lastShot = enemyTime;
+					}
+				} else {
+					if(enemyTime - me.lastBurst > me.burstDelay * 1000) {
+						me.firing = true;
+					}
+				}
+
+				if (me.following == true && type != 'boss') {
+					if (me.position.x > player.position.x) {
+						me.position.x -= me.speed;
+					} else if (me.position.x < player.position.x) {
+						me.position.x += me.speed;
+					}
+
+					if (me.position.y < player.position.y && player.grounded && me.grounded) {
+						me.velocity.y = 10;
+						// player.position.y += 1;
+						me.grounded = false;
+					}
+				}
+
+				if (distance > me.agroRadius) {
+					me.following = false;
+				}
+			// }
+		// }
 	}
 }
